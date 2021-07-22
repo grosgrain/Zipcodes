@@ -1,6 +1,7 @@
 package zipCodesService
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -11,7 +12,7 @@ type RequestService struct {
 
 func NewRequestService() *RequestService {
 	s := new(RequestService)
-	s.ZipCodesDataService,s.Error = NewZipCodesDataService("../public/assets/uszips.xlsx")
+	s.ZipCodesDataService,s.Error = NewZipCodesDataService("../public/assets/uszips.csv")
 	return s
 }
 
@@ -23,6 +24,10 @@ func (s *RequestService)GetAllZipCodesData()(map[string]ZipCodeNode, error) {
 	return zipCodesDataset.DatasetList, err
 }
 
-func Lookup() {
-
+func (s *RequestService)Lookup(zip string)(*ZipCodeNode, error) {
+	foundedZipCode := s.ZipCodesDataService.DatasetList[zip]
+	if (foundedZipCode == ZipCodeNode{}) {
+		return &ZipCodeNode{}, fmt.Errorf("zipcodes: zipcode %s not found !", zip)
+	}
+	return &foundedZipCode, nil
 }

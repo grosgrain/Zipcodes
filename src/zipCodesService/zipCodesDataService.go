@@ -3,17 +3,17 @@ package zipCodesService
 import (
 	"fmt"
 	"log"
-	"strconv"
+	"os"
 
-	"github.com/360EntSecGroup-Skylar/excelize"
+	"github.com/gocarina/gocsv"
 )
 
 type ZipCodeNode struct {
-	ZipCode string
-	Lat float64
-	Lng float64
-	City string
-	State string
+	Zip string `csv:"zip"`
+	Lat float64 `csv:"lat"`
+	Lng float64 `csv:"lng"`
+	City string `csv:"city"`
+	State string `csv:"state_id"`
 }
 
 type ZipCodes struct {
@@ -29,29 +29,19 @@ func NewZipCodesDataService(datasetPath string) (*ZipCodes, error) {
 }
 
 func loadDataset(dataPath string)(ZipCodes, error)  {
-	file, err := excelize.OpenFile(dataPath)
+	in, err := os.Open(dataPath)
 	if err != nil {
-		log.Fatal(err)
-		return ZipCodes{}, fmt.Errorf("zipcodes: error while opening file %v", err)
+		panic(err)
 	}
-	rows, error := file.Rows("Sheet1")
-	if error != nil {
-		log.Fatal(error)
-		return ZipCodes{}, fmt.Errorf("zipcodes: error while opening spreadsheet %v", error)
-	}
+	defer in.Close()
+	list := []*ZipCodeNode{}
 	zipCodeMap := ZipCodes{DatasetList: make(map[string]ZipCodeNode)}
-
-	for rows.Next() {
-		row, _ := rows.Columns()
-		lat,_ := strconv.ParseFloat(row[1], 64)
-		lng,_ := strconv.ParseFloat(row[2], 64)
-		zipCodeMap.DatasetList[row[0]] = ZipCodeNode{
-			ZipCode: row[0],
-			Lat:     lat,
-			Lng:     lng,
-			City:    row[3],
-			State:   row[4],
-		}
+	if err := gocsv.UnmarshalFile(in, &list); err != nil {
+		log.Fatal(err)
+		return ZipCodes{}, fmt.Errorf("zipcodes: error while opening spreadsheet %v", err)
+	}
+	for _, v := range list {
+		zipCodeMap.DatasetList[v.Zip] = *v
 	}
 	return zipCodeMap, err
 }
