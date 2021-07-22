@@ -20,7 +20,7 @@ type ZipCodes struct {
 	DatasetList map[string]ZipCodeNode
 }
 
-func New(datasetPath string) (*ZipCodes, error) {
+func NewZipCodesDataService(datasetPath string) (*ZipCodes, error) {
 	zipcodes, err := loadDataset(datasetPath)
 	if err != nil {
 		return nil, err

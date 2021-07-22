@@ -2,16 +2,27 @@ package zipCodesService
 
 import (
 	"log"
-	"net/http"
-	"encoding/json"
 )
 
-func GetAllZipCodesData(w http.ResponseWriter, r *http.Request) {
-	zipCodesDataset,err := New("../public/assets/uszips.xlsx")
+type RequestService struct {
+	ZipCodesDataService *ZipCodes
+	Error error
+}
+
+func NewRequestService() *RequestService {
+	s := new(RequestService)
+	s.ZipCodesDataService,s.Error = NewZipCodesDataService("../public/assets/uszips.xlsx")
+	return s
+}
+
+func (s *RequestService)GetAllZipCodesData()(map[string]ZipCodeNode, error) {
+	zipCodesDataset,err := s.ZipCodesDataService, s.Error
 	if err != nil {
 		log.Fatal(err)
-		return
 	}
-	json.NewEncoder(w).Encode(zipCodesDataset.DatasetList)
-	return
+	return zipCodesDataset.DatasetList, err
+}
+
+func Lookup() {
+
 }
