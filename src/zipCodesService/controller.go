@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"sync"
 )
+
+const googleMaximumZipsPerRequest  = 20
 
 func GetAllZipCodesData(w http.ResponseWriter, r *http.Request) {
 	requestService := NewRequestService()
@@ -51,22 +54,30 @@ func GetDistanceFromOneZipToMultipleZips(w http.ResponseWriter, r *http.Request)
 		c <- data
 	}()
 	zipLists := <-c
-	chanel := make(chan ZipToDistanceMapping, len(zipLists))
-	for _, v := range zipLists {
-		go func(v string) {
-			data, _ := NewRequestService().GetDistanceFromOnePointToAnother(*zip, v)
-			chanel <- data
-		}(v)
+	var lists []ZipToDistanceMapping
+	var wg sync.WaitGroup
+	for i := 0; i < len(zipLists) / googleMaximumZipsPerRequest + 1; i++ {
+		var end int
+		if i * googleMaximumZipsPerRequest + googleMaximumZipsPerRequest < len(zipLists) {
+			end = i * googleMaximumZipsPerRequest + googleMaximumZipsPerRequest
+		} else {
+			end = len(zipLists)
+		}
+		temp := zipLists[i * googleMaximumZipsPerRequest : end]
+		wg.Add(1)
+		go func() {
+			data,_ := NewRequestService().GetDistanceFromOnePointToMultiplePoints(*zip, temp, &wg)
+			lists = append(lists, data...)
+		}()
 	}
-	for i := 0; i < len(zipLists); i++ {
-		temp := <-chanel
-		if float64(temp.Distance) <= *radius {
+	wg.Wait()
+	for _, v:= range lists {
+		if float64(v.Distance) <= *radius {
 			res := make(map[string]float32)
-			res[temp.Zip] = temp.Distance
+			res[v.Zip] = v.Distance
 			json.NewEncoder(w).Encode(res)
 		}
 	}
-	close(chanel)
 	return
 }
 

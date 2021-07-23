@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"sync"
 
 	"googlemaps.github.io/maps"
 )
@@ -96,6 +97,35 @@ func (s *RequestService) GetDistanceFromOnePointToAnother(originZip string, dest
 		OriginZip: originZip,
 		Distance:  float32(route.Rows[0].Elements[0].Distance.Meters) / meterInMiles,
 	}
+	return res, nil
+}
+
+func (s *RequestService) GetDistanceFromOnePointToMultiplePoints(originZip string, destZips []string, wg *sync.WaitGroup) ([]ZipToDistanceMapping, error)  {
+	googleMatrixAPIKey,_ := os.LookupEnv("GOOGLE_DISTANCE_MATRIX_API_KEY")
+	c, err := maps.NewClient(maps.WithAPIKey(googleMatrixAPIKey))
+	if err != nil {
+		log.Fatalf("fatal error: %s", err)
+	}
+	r := &maps.DistanceMatrixRequest{
+		Origins:      []string{originZip},
+		Destinations: destZips,
+		Units:        maps.UnitsImperial,
+		Language:     "en",
+	}
+	route, err := c.DistanceMatrix(context.Background(), r)
+
+	if err != nil {
+		log.Fatalf("Fatal error: %s", err)
+	}
+	res := make([]ZipToDistanceMapping, len(destZips))
+	for i, destZip := range destZips {
+		res[i] = ZipToDistanceMapping{
+			Zip:       destZip,
+			OriginZip: originZip,
+			Distance:  float32(route.Rows[0].Elements[i].Distance.Meters) / meterInMiles,
+		}
+	}
+	defer wg.Done()
 	return res, nil
 }
 
