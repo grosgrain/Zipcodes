@@ -1,21 +1,25 @@
 package zipCodesService
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math"
 	"os"
+
+	"googlemaps.github.io/maps"
 )
 
 const (
 	earthRadiusKm = 6371
 	earthRadiusMi = 3958
+	meterInMiles = 1609.34
 )
 
 type ZipToDistanceMapping struct {
-	zip string
-	originZip string
-	distance string
+	Zip string
+	OriginZip string
+	Distance float32
 }
 
 type RequestService struct {
@@ -70,8 +74,28 @@ func (s *RequestService) GetZipCodesWithinRadius(zipCode string, radius float64,
 	return list, nil
 }
 
-func (s *RequestService) GetDistanceFromOnePointToAnother(originZip string, destZip string) ([]ZipToDistanceMapping, error)  {
-    res := make([]ZipToDistanceMapping,0)
+func (s *RequestService) GetDistanceFromOnePointToAnother(originZip string, destZip string) (ZipToDistanceMapping, error)  {
+    googleMatrixAPIKey,_ := os.LookupEnv("GOOGLE_DISTANCE_MATRIX_API_KEY")
+	c, err := maps.NewClient(maps.WithAPIKey(googleMatrixAPIKey))
+	if err != nil {
+		log.Fatalf("fatal error: %s", err)
+	}
+	r := &maps.DistanceMatrixRequest{
+		Origins:      []string{originZip},
+		Destinations: []string{destZip},
+		Units:        maps.UnitsImperial,
+		Language:     "en",
+	}
+	route, err := c.DistanceMatrix(context.Background(), r)
+
+	if err != nil {
+		log.Fatalf("Fatal error: %s", err)
+	}
+    res := ZipToDistanceMapping{
+		Zip:       destZip,
+		OriginZip: originZip,
+		Distance:  float32(route.Rows[0].Elements[0].Distance.Meters) / meterInMiles,
+	}
 	return res, nil
 }
 
