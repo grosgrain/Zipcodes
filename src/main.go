@@ -17,6 +17,7 @@ func main() {
 	freightMatchingRouter.HandleFunc("/allZipCodes", zipCodesService.GetAllZipCodesData).Methods("GET")
 	freightMatchingRouter.HandleFunc("/zipCodeLookup", zipCodesService.Lookup).Methods("POST")
 	freightMatchingRouter.HandleFunc("/zipCodesWithinRadius", zipCodesService.GetZipCodesWithinRadius).Methods("POST")
+	freightMatchingRouter.HandleFunc("/distanceFromOneZipToMultipleZips", zipCodesService.GetDistanceFromOneZipToMultipleZips).Methods("POST")
 	log.Fatal(http.ListenAndServe(":4001", router))
 
 }
