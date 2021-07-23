@@ -50,6 +50,14 @@ func GetDistanceFromOneZipToMultipleZips(w http.ResponseWriter, r *http.Request)
 		data, _ := NewRequestService().GetZipCodesWithinRadius(*zip, *radius, *inMiles)
 		c <- data
 	}()
+	zipLists := <-c
+	chanel := make(chan []ZipToDistanceMapping, len(zipLists))
+	for _, v := range zipLists {
+		go func(v string) {
+			data, _ := NewRequestService().GetDistanceFromOnePointToAnother(*zip, v)
+			chanel <- data
+		}(v)
+	}
 }
 
 func validateZipRadiusMatrix(w http.ResponseWriter, r *http.Request)(*string, *float64, *bool)  {

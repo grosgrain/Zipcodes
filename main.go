@@ -3,14 +3,28 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/grosgrain/zipcodes/src/zipCodesService"
+	"github.com/joho/godotenv"
 )
 
+// init is invoked before main()
+func init() {
+	// loads values from .env into the system
+	if err := godotenv.Load(); err != nil {
+		log.Print("No .env file found")
+	}
+}
 
 func main() {
 	router := mux.NewRouter().StrictSlash(true)
+
+	port, exists := os.LookupEnv("ZIP_CODE_SERVICE_PORT")
+	if !exists {
+		port = ":4001"
+	}
 
 	//Freight Matching route
 	freightMatchingRouter := router.PathPrefix("/zipCode").Subrouter()
@@ -18,6 +32,6 @@ func main() {
 	freightMatchingRouter.HandleFunc("/zipCodeLookup", zipCodesService.Lookup).Methods("POST")
 	freightMatchingRouter.HandleFunc("/zipCodesWithinRadius", zipCodesService.GetZipCodesWithinRadius).Methods("POST")
 	freightMatchingRouter.HandleFunc("/distanceFromOneZipToMultipleZips", zipCodesService.GetDistanceFromOneZipToMultipleZips).Methods("POST")
-	log.Fatal(http.ListenAndServe(":4001", router))
+	log.Fatal(http.ListenAndServe(port, router))
 
 }

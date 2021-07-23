@@ -4,12 +4,19 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 )
 
 const (
 	earthRadiusKm = 6371
 	earthRadiusMi = 3958
 )
+
+type ZipToDistanceMapping struct {
+	zip string
+	originZip string
+	distance string
+}
 
 type RequestService struct {
 	ZipCodesDataService *ZipCodes
@@ -18,7 +25,9 @@ type RequestService struct {
 
 func NewRequestService() *RequestService {
 	s := new(RequestService)
-	s.ZipCodesDataService,s.Error = NewZipCodesDataService("../public/assets/uszips.csv")
+	pwd, _ := os.Getwd()
+	path := pwd + "/public/assets/uszips.csv"
+	s.ZipCodesDataService,s.Error = NewZipCodesDataService(path)
 	return s
 }
 
@@ -59,6 +68,11 @@ func (s *RequestService) GetZipCodesWithinRadius(zipCode string, radius float64,
 		}
 	}
 	return list, nil
+}
+
+func (s *RequestService) GetDistanceFromOnePointToAnother(originZip string, destZip string) ([]ZipToDistanceMapping, error)  {
+    res := make([]ZipToDistanceMapping,0)
+	return res, nil
 }
 
 // DistanceBetweenPoints returns the distance between two lat/lng points using the Haversin distance formula.
