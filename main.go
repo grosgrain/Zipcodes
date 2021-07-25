@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/grosgrain/zipcodes/src/zipCodesService"
+	"github.com/grosgrain/zipcodes/src/freightMatchingService"
 	"github.com/joho/godotenv"
 )
 
@@ -32,6 +33,8 @@ func main() {
 	freightMatchingRouter.HandleFunc("/zipCodeLookup", zipCodesService.Lookup).Methods("POST")
 	freightMatchingRouter.HandleFunc("/zipCodesWithinRadius", zipCodesService.GetZipCodesWithinRadius).Methods("POST")
 	freightMatchingRouter.HandleFunc("/distanceFromOneZipToMultipleZips", zipCodesService.GetDistanceFromOneZipToMultipleZips).Methods("POST")
+	freightMatchingRouter.HandleFunc("/getNearbyCarriers", freightMatchingService.GetNearbyCarriers).Methods("POST")
+
 	log.Fatal(http.ListenAndServe(port, router))
 
 }
