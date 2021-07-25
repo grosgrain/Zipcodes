@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
 
 	Redis "github.com/go-redis/redis"
 	ZipCodeService "github.com/grosgrain/zipcodes/src/zipCodesService"
 	_ "github.com/lib/pq"
-
 )
 
 type RequestService struct {
@@ -24,9 +24,9 @@ type Carrier struct {
 	Zip string `json:"zip"`
 	Active int `json:"active"`
 	NoLoad int `json:"noload"`
-	PrimaryBrokerId string `json:"primarybrokerid"`
+	PrimaryBrokerId *string `json:"primarybrokerid"`
 	PowerUnit int `json:"powerunits"`
-	Distance float64 `json:"distance"`
+	Distance float32`json:"distance"`
 }
 
 var (
@@ -56,81 +56,83 @@ func (s *RequestService)GetNearbyCarriers(zip string, radius float64, page int) 
 		}
 		return mapJSON, nil
 	} else {
-		/*results := make([]Carrier, 2)
-		results[0] = Carrier{
-			Id:              "1",
-			Name:            "haha",
-			Zip:             "45140",
-			Active:          1,
-			NoLoad:          1,
-			PrimaryBrokerId: "",
-			PowerUnit:       42,
-			Distance:        0,
-		}
-		results[1] = Carrier{
-			Id:              "1",
-			Name:            "jaja",
-			Zip:             "93065",
-			Active:          1,
-			NoLoad:          1,
-			PrimaryBrokerId: "",
-			PowerUnit:       14,
-			Distance:        0,
-		}
-		json, _ := json.Marshal(results)
-		err = redisClient.Set(zip + fmt.Sprintf("%f", radius), json, 0).Err()
-		if err != nil {
-			fmt.Println(err)
-		}
-		return results, nil*/
+		//Get zips within radius
 		c := make(chan []string, 20)
 		go func() {
-			data, _ := zipCodeService.GetZipCodesWithinRadius(zip, radius, false)
+			data, _ := zipCodeService.GetZipCodesWithinRadius(zip, radius, true)
 			c <- data
 		}()
 		zipLists := <-c
 
-		DB = connectDB()
-		sql := "SELECT id, zip, carriername, active, noload, primarybrokerid, powerunit FROM carriers JOIN carriersaferinfo ON carriersaferinfo.carrierid=carriers.id WHERE zip IN ($1) DISTINCT"
-		rows, err := DB.Query(sql, zipLists)
-		if err != nil {
-			panic(err)
-		}
-		defer rows.Close()
+		//Get carriers info from DB
+		results := make(chan []Carrier)
 
-		var results []Carrier
-		for rows.Next() {
-			var temp Carrier
-			err = rows.Scan(&temp.Id, &temp.Zip, &temp.Name, &temp.Active, &temp.NoLoad, &temp.PrimaryBrokerId, &temp.PowerUnit)
+		go func() {
+			zipString := strings.Join(zipLists, "','")
+			DB = connectDB()
+			sql :=  fmt.Sprintf(`SELECT carriers.id, carriers.zip, carriers.carriername, carriers.active, carriers.noload, carriers.primarybrokerid, carriersaferinfo.powerunits FROM carriers JOIN carriersaferinfo ON carriersaferinfo.carrierid=carriers.id WHERE carriers.zip IN ('%s')`, zipString)
+			rows, err := DB.Query(sql)
 			if err != nil {
 				panic(err)
 			}
-			results = append(results, temp)
-		}
-		var lists []ZipCodeService.ZipToDistanceMapping
-		var wg sync.WaitGroup
-		for i := 0; i < len(zipLists) / googleMaximumZipsPerRequest + 1; i++ {
-			var end int
-			if i * googleMaximumZipsPerRequest + googleMaximumZipsPerRequest < len(zipLists) {
-				end = i * googleMaximumZipsPerRequest + googleMaximumZipsPerRequest
-			} else {
-				end = len(zipLists)
+			defer rows.Close()
+			defer DB.Close()
+
+			var tempArray []Carrier
+			for rows.Next() {
+				var temp Carrier
+				err = rows.Scan(&temp.Id, &temp.Zip, &temp.Name, &temp.Active, &temp.NoLoad, &temp.PrimaryBrokerId, &temp.PowerUnit)
+				if err != nil {
+					panic(err)
+				}
+				tempArray = append(tempArray, temp)
 			}
-			temp := zipLists[i * googleMaximumZipsPerRequest : end]
-			wg.Add(1)
-			go func() {
-				data,_ := zipCodeService.GetDistanceFromOnePointToMultiplePoints(zip, temp, &wg)
-				lists = append(lists, data...)
-			}()
-		}
-		wg.Wait()
-		res := make(map[string]float32)
-		for _, v:= range lists {
-			if float64(v.Distance) <= radius {
-				res[v.Zip] = v.Distance
+			results <- tempArray
+		}()
+
+		carrierResults := <-results
+
+		//Calculate driving distances between zips
+
+		if len(carrierResults) > 0 {
+			var lists []ZipCodeService.ZipToDistanceMapping
+			var wg sync.WaitGroup
+			for i := 0; i < len(zipLists)/googleMaximumZipsPerRequest+1; i++ {
+				var end int
+				if i*googleMaximumZipsPerRequest+googleMaximumZipsPerRequest < len(zipLists) {
+					end = i*googleMaximumZipsPerRequest + googleMaximumZipsPerRequest
+				} else {
+					end = len(zipLists)
+				}
+				temp := zipLists[i*googleMaximumZipsPerRequest : end]
+				wg.Add(1)
+				go func() {
+					data, _ := zipCodeService.GetDistanceFromOnePointToMultiplePoints(zip, temp, &wg)
+					lists = append(lists, data...)
+				}()
+			}
+			wg.Wait()
+			zipMap := make(map[string]float32)
+			for _, v := range lists {
+				zipMap[v.Zip] = v.Distance
+			}
+			for i := len(carrierResults) - 1; i >= 0; i-- {
+				if val, ok := zipMap[carrierResults[i].Zip]; ok && float64(val) <= radius {
+					carrierResults[i].Distance = val
+				} else {
+					//Wipe out carriers that driving distance larger than radius
+					carrierResults = append(carrierResults[:i], carrierResults[i + 1 :]...)
+				}
+			}
+
+			//Add results to Redis cache
+			json, _ := json.Marshal(carrierResults)
+			err = redisClient.Set(zip + fmt.Sprintf("%f", radius), json, 86400).Err()
+			if err != nil {
+				fmt.Println(err)
 			}
 		}
-		return results, nil
+		return carrierResults, nil
 	}
 }
 

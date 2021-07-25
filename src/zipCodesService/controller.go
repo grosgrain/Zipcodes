@@ -12,12 +12,12 @@ const googleMaximumZipsPerRequest  = 20
 func GetAllZipCodesData(w http.ResponseWriter, r *http.Request) {
 	requestService := NewRequestService()
 	if requestService.Error != nil {
-		log.Fatal(requestService.Error)
+		log.Fatal("Failed to set up ZipCodeService", requestService.Error)
 		return
 	}
 	data,err := requestService.GetAllZipCodesData()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to fetch all zip codes data", err)
 		return
 	}
 	json.NewEncoder(w).Encode(data)

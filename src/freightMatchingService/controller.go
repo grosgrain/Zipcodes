@@ -10,13 +10,13 @@ import (
 func GetNearbyCarriers(w http.ResponseWriter, r *http.Request) {
 	requestService := NewRequestService()
 	if requestService.Error != nil {
-		log.Fatal(requestService.Error)
+		log.Fatal("Failed to set up freightMatchingService", requestService.Error)
 		return
 	}
 	zip, radius, page := validateZipRadiusPage(w, r)
 	data,err := requestService.GetNearbyCarriers(*zip, *radius, *page)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to fetch nearby carriers", err)
 		return
 	}
 	json.NewEncoder(w).Encode(data)

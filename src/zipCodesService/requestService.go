@@ -101,6 +101,10 @@ func (s *RequestService) GetDistanceFromOnePointToAnother(originZip string, dest
 }
 
 func (s *RequestService) GetDistanceFromOnePointToMultiplePoints(originZip string, destZips []string, wg *sync.WaitGroup) ([]ZipToDistanceMapping, error)  {
+	if originZip == "" || destZips == nil || len(destZips) <= 0 {
+		log.Fatal("Inputs are not valid")
+		return nil, nil
+	}
 	googleMatrixAPIKey,_ := os.LookupEnv("GOOGLE_DISTANCE_MATRIX_API_KEY")
 	c, err := maps.NewClient(maps.WithAPIKey(googleMatrixAPIKey))
 	if err != nil {
@@ -115,7 +119,7 @@ func (s *RequestService) GetDistanceFromOnePointToMultiplePoints(originZip strin
 	route, err := c.DistanceMatrix(context.Background(), r)
 
 	if err != nil {
-		log.Fatalf("Fatal error: %s", err)
+		log.Fatalf("Fatal error from Google Distance Matrix API: %s", err)
 	}
 	res := make([]ZipToDistanceMapping, len(destZips))
 	for i, destZip := range destZips {
