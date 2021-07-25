@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	Redis "github.com/go-redis/redis"
 	ZipCodeService "github.com/grosgrain/zipcodes/src/zipCodesService"
@@ -68,9 +70,10 @@ func (s *RequestService)GetNearbyCarriers(zip string, radius float64, page int) 
 		results := make(chan []Carrier)
 
 		go func() {
+			zipLists = append(zipLists, zip)
 			zipString := strings.Join(zipLists, "','")
 			DB = connectDB()
-			sql :=  fmt.Sprintf(`SELECT carriers.id, carriers.zip, carriers.carriername, carriers.active, carriers.noload, carriers.primarybrokerid, carriersaferinfo.powerunits FROM carriers JOIN carriersaferinfo ON carriersaferinfo.carrierid=carriers.id WHERE carriers.zip IN ('%s')`, zipString)
+			sql :=  fmt.Sprintf(`SELECT DISTINCT carriers.id, carriers.zip, carriers.carriername, carriers.active, carriers.noload, carriers.primarybrokerid, carriersaferinfo.powerunits FROM carriers JOIN carriersaferinfo ON carriersaferinfo.carrierid=carriers.id WHERE carriers.zip IN ('%s')`, zipString)
 			rows, err := DB.Query(sql)
 			if err != nil {
 				panic(err)
@@ -125,9 +128,14 @@ func (s *RequestService)GetNearbyCarriers(zip string, radius float64, page int) 
 				}
 			}
 
+			//Sort results by distance
+			sort.SliceStable(carrierResults, func(i, j int) bool {
+				return carrierResults[i].Distance < carrierResults[j].Distance
+			})
+
 			//Add results to Redis cache
 			json, _ := json.Marshal(carrierResults)
-			err = redisClient.Set(zip + fmt.Sprintf("%f", radius), json, 86400).Err()
+			err = redisClient.Set(zip + fmt.Sprintf("%f", radius), json, 24 * time.Hour).Err()
 			if err != nil {
 				fmt.Println(err)
 			}
