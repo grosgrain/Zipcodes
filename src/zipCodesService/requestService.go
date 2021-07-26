@@ -60,6 +60,7 @@ func (s *RequestService) GetZipCodesWithinRadius(zipCode string, radius float64,
 		earthRadius = earthRadiusKm
 	}
 	list := []string{}
+	list = append(list, zipCode)
 	location, err := s.Lookup(zipCode)
 	if err != nil {
 		return list, err
